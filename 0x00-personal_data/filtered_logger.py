@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
-""" Use of regex in replacing occurrences of certain field values """
+"""
+Module for filtering sensitive information from log messages.
+"""
+
+import logging
 import re
 from typing import List
-import logging
-import mysql.connector
-import os
 
+PII_FIELDS: List[str] = ["name", "email", "phone", "ssn", "password"]
 
 class RedactingFormatter(logging.Formatter):
-    """The Formatter class
+    """
+    Redacting Formatter class for logging.
     """
 
     REDACTION = "***"
@@ -17,74 +20,40 @@ class RedactingFormatter(logging.Formatter):
 
     def __init__(self, fields: List[str]):
         super(RedactingFormatter, self).__init__(self.FORMAT)
-        self.fields = fields
+        self.fields = list(fields)
 
     def format(self, record: logging.LogRecord) -> str:
-        """ Returns filtered values from log records """
-        return filter_datum(self.fields, self.REDACTION,
-                            super().format(record), self.SEPARATOR)
-
-
-PII_FIELDS = ("name", "email", "password", "ssn", "phone")
-
-
-def get_db() -> mysql.connector.connection.MYSQLConnection:
-    """ Connection to MySQL environment """
-    db_connect = mysql.connector.connect(
-        user=os.getenv('PERSONAL_DATA_DB_USERNAME', 'root'),
-        password=os.getenv('PERSONAL_DATA_DB_PASSWORD', ''),
-        host=os.getenv('PERSONAL_DATA_DB_HOST', 'localhost'),
-        database=os.getenv('PERSONAL_DATA_DB_NAME')
-    )
-    return db_connect
-
-
-def filter_datum(fields: List[str], redaction: str, message: str,
-                 separator: str) -> str:
-    """ Returns regex obfuscated log messages """
-    for field in fields:
-        message = re.sub(f'{field}=(.*?){separator}',
-                         f'{field}={redaction}{separator}', message)
-    return message
-
+        """
+        Format the log record, redacting specified fields.
+        """
+        msg = super().format(record)
+        for field in self.fields:
+            msg = re.sub(rf'{field}=(.*?){self.SEPARATOR}', f'{field}={self.REDACTION}{self.SEPARATOR}', msg)
+        return msg
 
 def get_logger() -> logging.Logger:
-    """ Returns a logging.Logger object """
-    logger = logging.getLogger("user_data")
+    """
+    Returns a logger object named 'user_data'.
+    """
+    logger = logging.getLogger('user_data')
     logger.setLevel(logging.INFO)
     logger.propagate = False
 
-    target_handler = logging.StreamHandler()
-    target_handler.setLevel(logging.INFO)
+    formatter = RedactingFormatter(PII_FIELDS)
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
 
-    formatter = RedactingFormatter(list(PII_FIELDS))
-    target_handle.setFormatter(formatter)
+    logger.addHandler(console_handler)
 
-    logger.addHandler(target_handler)
     return logger
 
-
-def main() -> None:
-    """ Obtains database connection using get_db
-    retrieve all role in the users table and display
-    each row under a filtered format
+def get_db() -> Any:
     """
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute("SELECT * FROM users;")
+    Connects to the database and returns a connection object.
+    """
+    # Your database connection logic here
+    pass
 
-    headers = [field[0] for field in cursor.description]
+if __name__ == "__main__":
     logger = get_logger()
-
-    for row in cursor:
-        info_answer = ''
-        for f, p in zip(row, headers):
-            info_answer += f'{p}={(f)}; '
-        logger.info(info_answer)
-
-    cursor.close()
-    db.close()
-
-
-if __name__ == '__main__':
-    main()
+    logger.info("This is a sample log message.")
