@@ -8,7 +8,7 @@ from models.user import User
 
 @app_views.route('/users', methods=['GET'], strict_slashes=False)
 def view_all_users() -> str:
-    """ 
+    """
     GET /api/v1/users
     Return:
       - list of all User objects JSON represented
